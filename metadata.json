@@ -1,0 +1,5 @@
+{
+  "name": "TaxiLibre",
+  "description": "A professional ride-sharing platform with real-time tracking, driver matching, and secure payments.",
+  "requestFramePermissions": ["geolocation"]
+}
