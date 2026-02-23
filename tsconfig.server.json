@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "module": "ESNext",
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowJs": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": false,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": false,
+    "noEmit": false
+  },
+  "include": ["server.ts", "server/**/*"]
+}

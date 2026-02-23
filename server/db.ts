@@ -7,11 +7,12 @@ const db = new Database('taxilibre.db');
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supabase_user_id TEXT UNIQUE,
     role TEXT CHECK(role IN ('passenger', 'driver', 'admin')) NOT NULL,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     phone TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT,
     status TEXT DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
