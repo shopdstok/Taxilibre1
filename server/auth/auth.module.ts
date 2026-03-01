@@ -20,4 +20,10 @@ import { JwtAuthGuard } from './jwt-auth.guard';
   providers: [AuthService, DatabaseService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService, DatabaseService, JwtModule, JwtAuthGuard],
 })
-export class AuthModule {}
+export class AuthModule {
+  constructor() {
+    console.log('AuthModule initialized');
+    const secret = process.env.JWT_SECRET || 'super-secret-key';
+    console.log('JWT Secret loaded:', secret === 'super-secret-key' ? 'using default' : 'using env var');
+  }
+}

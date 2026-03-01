@@ -66,7 +66,6 @@ export class MapsService {
         params: {
           input,
           key: apiKey,
-          types: 'address',
           language: 'fr',
         },
       });

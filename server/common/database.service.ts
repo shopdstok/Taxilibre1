@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { join } from 'path';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
@@ -21,6 +22,8 @@ export class DatabaseService implements OnModuleInit {
         phone TEXT,
         password_hash TEXT NOT NULL,
         status TEXT CHECK(status IN ('ACTIVE', 'SUSPENDED', 'DELETED')) DEFAULT 'ACTIVE',
+        language TEXT DEFAULT 'fr',
+        country TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -28,7 +31,10 @@ export class DatabaseService implements OnModuleInit {
       CREATE TABLE IF NOT EXISTS drivers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER UNIQUE NOT NULL,
+        driver_type TEXT CHECK(driver_type IN ('TAXI', 'VTC')) DEFAULT 'VTC',
         licence_number TEXT,
+        taxi_license_number TEXT,
+        vtc_license_number TEXT,
         status TEXT CHECK(status IN ('PENDING_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED')) DEFAULT 'PENDING_REVIEW',
         rating REAL DEFAULT 5.0,
         is_verified INTEGER DEFAULT 0,
@@ -53,6 +59,7 @@ export class DatabaseService implements OnModuleInit {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         passenger_id INTEGER NOT NULL,
         driver_id INTEGER,
+        service_type TEXT CHECK(service_type IN ('TAXI', 'VTC')) DEFAULT 'VTC',
         pickup_address TEXT NOT NULL,
         pickup_lat REAL NOT NULL,
         pickup_lng REAL NOT NULL,
@@ -127,10 +134,11 @@ export class DatabaseService implements OnModuleInit {
     // Seed Admin if not exists
     const admin = this.db.prepare('SELECT * FROM users WHERE role = ?').get('ADMIN');
     if (!admin) {
+      const passwordHash = bcrypt.hashSync('password123', 10);
       this.db.prepare(`
         INSERT INTO users (role, name, email, password_hash)
         VALUES (?, ?, ?, ?)
-      `).run('ADMIN', 'Super Admin', 'admin@taxilibre.com', '$2b$10$X7vH8G8G8G8G8G8G8G8G8O'); // password: password123 (mock hash)
+      `).run('ADMIN', 'Super Admin', 'admin@taxilibre.com', passwordHash);
     }
   }
 

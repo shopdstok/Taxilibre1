@@ -1,14 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { DatabaseService } from '../common/database.service';
 import { DriverLocationService } from '../drivers/driver-location.service';
-import { SupabaseService } from '../supabase/supabase-auth.service';
 
 @Injectable()
 export class MatchingService {
   constructor(
-    private databaseService: DatabaseService,
-    private driverLocationService: DriverLocationService,
-    private supabaseService: SupabaseService
+    @Inject(DatabaseService) private databaseService: DatabaseService,
+    @Inject(DriverLocationService) private driverLocationService: DriverLocationService,
   ) {}
 
   async findDriverForRide(rideId: number) {
@@ -33,8 +31,8 @@ export class MatchingService {
       // For this demo, we'll automatically assign the first available driver
       
       const driver: any = this.databaseService.get(
-        'SELECT u.id, u.name, u.supabase_user_id FROM users u JOIN drivers d ON u.id = d.user_id WHERE u.supabase_user_id = ? AND d.is_verified = 1',
-        [nearby.driverId]
+        'SELECT u.id, u.name FROM users u JOIN drivers d ON u.id = d.user_id WHERE u.id = ? AND d.is_verified = 1 AND d.driver_type = ?',
+        [nearby.driverId, ride.service_type]
       );
 
       if (driver) {
@@ -44,8 +42,8 @@ export class MatchingService {
           [driver.id, rideId]
         );
 
-        // Mark driver as unavailable in Supabase
-        await this.driverLocationService.updateLocationWithSupabaseId(driver.supabase_user_id, nearby.lat, nearby.lng, false);
+        // Mark driver as unavailable
+        await this.driverLocationService.updateLocation(driver.id, nearby.lat, nearby.lng, false);
 
         console.log(`Assigned driver ${driver.id} to ride ${rideId}`);
         return driver;

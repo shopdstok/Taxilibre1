@@ -5,24 +5,25 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Server, WebSocket } from 'ws';
+import * as ws from 'ws';
 import { JwtService } from '@nestjs/jwt';
+import { Inject } from '@nestjs/common';
 
 @WebSocketGateway({ path: '/ws' })
 export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server: ws.Server;
 
-  private clients = new Map<number, { ws: WebSocket; role: string }>();
+  private clients = new Map<number, { ws: ws.WebSocket; role: string }>();
 
-  constructor(private jwtService: JwtService) {}
+  constructor(@Inject(JwtService) private jwtService: JwtService) {}
 
-  async handleConnection(client: WebSocket, req: any) {
+  async handleConnection(client: ws.WebSocket, req: any) {
     // Authentication via query param or message
     console.log('New WS connection attempt');
   }
 
-  handleDisconnect(client: WebSocket) {
+  handleDisconnect(client: ws.WebSocket) {
     this.clients.forEach((value, key) => {
       if (value.ws === client) {
         this.clients.delete(key);
@@ -32,7 +33,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('AUTH')
-  handleAuth(client: WebSocket, payload: { token: string }) {
+  handleAuth(client: ws.WebSocket, payload: { token: string }) {
     try {
       const decoded = this.jwtService.verify(payload.token);
       this.clients.set(decoded.sub, { ws: client, role: decoded.role });
@@ -44,7 +45,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('JOIN_RIDE')
-  handleJoinRide(client: WebSocket, payload: { rideId: number }) {
+  handleJoinRide(client: ws.WebSocket, payload: { rideId: number }) {
     // In a real app, we would verify the user's access to this ride
     // For simplicity, we just track which ride the client is interested in
     const userId = this.getUserId(client);
@@ -59,7 +60,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('LOCATION_UPDATE')
-  handleLocationUpdate(client: WebSocket, payload: { lat: number; lng: number; rideId?: number }) {
+  handleLocationUpdate(client: ws.WebSocket, payload: { lat: number; lng: number; rideId?: number }) {
     const userId = this.getUserId(client);
     if (userId) {
       // Broadcast to anyone interested in this specific ride
@@ -85,7 +86,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private getUserId(client: WebSocket): number | null {
+  private getUserId(client: ws.WebSocket): number | null {
     let userId: number | null = null;
     this.clients.forEach((v, k) => { if (v.ws === client) userId = k; });
     return userId;
@@ -95,7 +96,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!rideId) return;
     const payload = JSON.stringify(message);
     this.server.clients.forEach((client: any) => {
-      if (client.readyState === WebSocket.OPEN && client.rideId === rideId) {
+      if (client.readyState === ws.WebSocket.OPEN && client.rideId === rideId) {
         client.send(payload);
       }
     });
@@ -104,7 +105,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   broadcastToRole(role: string, message: any) {
     const payload = JSON.stringify(message);
     this.clients.forEach((client) => {
-      if (client.role === role && client.ws.readyState === WebSocket.OPEN) {
+      if (client.role === role && client.ws.readyState === ws.WebSocket.OPEN) {
         client.ws.send(payload);
       }
     });
@@ -112,7 +113,7 @@ export class RidesGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   sendToUser(userId: number, message: any) {
     const client = this.clients.get(userId);
-    if (client && client.ws.readyState === WebSocket.OPEN) {
+    if (client && client.ws.readyState === ws.WebSocket.OPEN) {
       client.ws.send(JSON.stringify(message));
     }
   }

@@ -1,25 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { DatabaseService } from '../common/database.service';
 import { DriverLocationService } from '../drivers/driver-location.service';
 
 @Injectable()
 export class RidesService {
   constructor(
-    private databaseService: DatabaseService,
-    private driverLocationService: DriverLocationService
+    @Inject(DatabaseService) private databaseService: DatabaseService,
+    @Inject(DriverLocationService) private driverLocationService: DriverLocationService
   ) {}
 
   async createRide(passengerId: number, data: any) {
-    const { pickup, destination, price, distance, duration } = data;
+    const { pickup, destination, price, distance, duration, serviceType } = data;
     
     const result = this.databaseService.run(`
-      INSERT INTO rides (passenger_id, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, price_total, distance_km, duration_min)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rides (passenger_id, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, price_total, distance_km, duration_min, service_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       passengerId, 
       pickup.address, pickup.lat, pickup.lng, 
       destination.address, destination.lat, destination.lng, 
-      price, distance, duration
+      price, distance, duration,
+      serviceType || 'VTC'
     ]);
 
     return { id: result.lastInsertRowid, status: 'REQUESTED' };
@@ -63,7 +64,7 @@ export class RidesService {
     `, [id]);
   }
 
-  async findNearbyDrivers(lat: number, lng: number) {
+  async findNearbyDrivers(lat: number, lng: number, serviceType?: string) {
     // 1. Get nearby driver IDs from real-time location service (Redis/Memory)
     const nearbyLocations = await this.driverLocationService.findNearbyDrivers(lat, lng, 5); // 5km radius
     
@@ -73,12 +74,15 @@ export class RidesService {
     
     // 2. Enrich with driver details from DB
     const placeholders = driverIds.map(() => '?').join(',');
-    const drivers = this.databaseService.query(`
-      SELECT u.id, u.name, d.rating, d.user_id
+    const sql = `
+      SELECT u.id, u.name, d.rating, d.user_id, d.driver_type
       FROM users u
       JOIN drivers d ON u.id = d.user_id
       WHERE u.id IN (${placeholders}) AND d.status = 'VERIFIED' AND d.is_available = 1
-    `, driverIds);
+      ${serviceType ? 'AND d.driver_type = ?' : ''}
+    `;
+    const params = serviceType ? [...driverIds, serviceType] : driverIds;
+    const drivers = this.databaseService.query(sql, params);
 
     // 3. Merge and sort by distance
     return drivers.map((d: any) => {

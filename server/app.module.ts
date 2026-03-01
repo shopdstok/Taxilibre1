@@ -6,11 +6,9 @@ import { RidesModule } from './rides/rides.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
 import { MapsModule } from './maps/maps.module';
-import { SupabaseModule } from './supabase/supabase.module';
 
 @Module({
   imports: [
-    SupabaseModule,
     AuthModule,
     UsersModule,
     DriversModule,

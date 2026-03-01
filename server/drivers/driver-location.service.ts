@@ -1,94 +1,48 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase-auth.service';
 
 export interface Location {
   lat: number;
   lng: number;
   lastUpdate: string;
+  isAvailable: boolean;
 }
 
 @Injectable()
 export class DriverLocationService {
-  constructor(private supabaseService: SupabaseService) {}
+  private locations = new Map<number, Location>();
 
-  async updateLocation(userId: number, lat: number, lng: number) {
-    const supabase = this.supabaseService.getAdminClient();
-    
-    // Get the supabase_user_id for this user
-    // In a real app, we might have this in the request user object already
-    // For now, we'll assume we need to use the supabase_user_id
-    
-    // We need to map local userId to supabase UUID
-    // Actually, the JwtAuthGuard already attaches supabaseId to req.user
-    // But updateLocation is called with userId.
-    
-    // Let's modify the controller to pass supabaseId if available, 
-    // or we fetch it here.
-    
-    // For simplicity, let's assume we use the supabaseId passed from controller
-    // I'll update the controller next.
-  }
-
-  async updateLocationWithSupabaseId(supabaseId: string, lat: number, lng: number, isAvailable: boolean = true) {
-    const supabase = this.supabaseService.getAdminClient();
-    
-    const { data, error } = await supabase
-      .from('driver_locations')
-      .upsert({
-        driver_id: supabaseId,
-        lat,
-        lng,
-        last_update: new Date().toISOString(),
-        is_available: isAvailable
-      }, { onConflict: 'driver_id' });
-
-    if (error) {
-      console.error('Error updating driver location in Supabase:', error);
-      throw new Error('Failed to update location');
-    }
-
-    return { lat, lng, lastUpdate: new Date().toISOString() };
-  }
-
-  async getLocationBySupabaseId(supabaseId: string): Promise<Location | null> {
-    const supabase = this.supabaseService.getClient();
-    const { data, error } = await supabase
-      .from('driver_locations')
-      .select('lat, lng, last_update')
-      .eq('driver_id', supabaseId)
-      .single();
-
-    if (error || !data) return null;
-
-    return {
-      lat: data.lat,
-      lng: data.lng,
-      lastUpdate: data.last_update
+  async updateLocation(userId: number, lat: number, lng: number, isAvailable: boolean = true) {
+    const location: Location = {
+      lat,
+      lng,
+      lastUpdate: new Date().toISOString(),
+      isAvailable
     };
+    this.locations.set(userId, location);
+    return location;
+  }
+
+  async getLocation(userId: number): Promise<Location | null> {
+    return this.locations.get(userId) || null;
   }
 
   async findNearbyDrivers(lat: number, lng: number, radiusKm: number = 5) {
-    const supabase = this.supabaseService.getClient();
+    const nearby: { driverId: number; distance: number; lat: number; lng: number }[] = [];
     
-    // Use a RPC call if PostGIS is enabled, or fetch and filter
-    // For this demo, we'll fetch available drivers and filter in JS
-    // In production, use PostGIS: st_distance(location, st_point(lng, lat)) < radius
-    
-    const { data, error } = await supabase
-      .from('driver_locations')
-      .select('driver_id, lat, lng')
-      .eq('is_available', true)
-      .gt('last_update', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // Last 5 mins
+    const now = Date.now();
+    const fiveMinutesAgo = now - 5 * 60 * 1000;
 
-    if (error || !data) return [];
+    this.locations.forEach((loc, driverId) => {
+      const lastUpdate = new Date(loc.lastUpdate).getTime();
+      if (loc.isAvailable && lastUpdate > fiveMinutesAgo) {
+        const distance = this.calculateDistance(lat, lng, loc.lat, loc.lng);
+        if (distance <= radiusKm) {
+          nearby.push({ driverId, distance, lat: loc.lat, lng: loc.lng });
+        }
+      }
+    });
 
-    return data
-      .map(d => ({
-        driverId: d.driver_id,
-        distance: this.calculateDistance(lat, lng, d.lat, d.lng)
-      }))
-      .filter(d => d.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance);
+    return nearby.sort((a, b) => a.distance - b.distance);
   }
 
   private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -104,14 +58,16 @@ export class DriverLocationService {
   }
 
   async getAllOnlineDrivers() {
-    const supabase = this.supabaseService.getClient();
-    const { data, error } = await supabase
-      .from('driver_locations')
-      .select('*')
-      .eq('is_available', true)
-      .gt('last_update', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+    const online: any[] = [];
+    const now = Date.now();
+    const tenMinutesAgo = now - 10 * 60 * 1000;
 
-    if (error) return [];
-    return data;
+    this.locations.forEach((loc, driverId) => {
+      const lastUpdate = new Date(loc.lastUpdate).getTime();
+      if (loc.isAvailable && lastUpdate > tenMinutesAgo) {
+        online.push({ driverId, ...loc });
+      }
+    });
+    return online;
   }
 }

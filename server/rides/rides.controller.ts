@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Request, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Request, ForbiddenException, NotFoundException, Inject } from '@nestjs/common';
 import { RidesService } from './rides.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DriverLocationService } from '../drivers/driver-location.service';
@@ -10,13 +10,20 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 @Controller('rides')
 export class RidesController {
   constructor(
-    private ridesService: RidesService,
-    private driverLocationService: DriverLocationService
+    @Inject(RidesService) private ridesService: RidesService,
+    @Inject(DriverLocationService) private driverLocationService: DriverLocationService
   ) {}
 
   @Post('request')
   async requestRide(@Request() req: any, @Body() body: any) {
     return this.ridesService.createRide(req.user.userId, body);
+  }
+
+  @Get('nearby-drivers')
+  @ApiOperation({ summary: 'Get nearby drivers for a location' })
+  async getNearbyDrivers(@Request() req: any, @Request() request: any) {
+    const { lat, lng, serviceType } = request.query;
+    return this.ridesService.findNearbyDrivers(Number(lat), Number(lng), serviceType as string);
   }
 
   @Get(':id')
